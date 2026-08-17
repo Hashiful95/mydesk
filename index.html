@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyDesk — Student Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-title">MyDesk</div>
+      <div class="brand-sub">Personal Student Dashboard</div>
+    </div>
+    <div class="top-actions">
+      <span id="userEmail">hashifulislam95@gmail.com</span>
+      <button class="icon-btn" title="Notifications">🔔<b id="notif">3</b></button>
+      <button id="themeBtn" class="outline-btn">🌙 Dark Mode</button>
+      <button class="outline-btn" id="logoutBtn">⇥ Logout</button>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="side-brand"><strong>MyDesk</strong><span>Student workspace</span></div>
+      <nav>
+        <button data-page="dashboard" onclick="go('dashboard')">
+          ⌂ <span>Dashboard</span>
+        </button>
+
+        <button data-page="tasks" onclick="go('tasks')">
+          ✓ <span>Tasks</span>
+        </button>
+
+        <button data-page="expenses" onclick="go('expenses')">
+          ₹ <span>Expenses</span>
+        </button>
+
+        <button data-page="attendance" onclick="go('attendance')">
+          ▣ <span>Attendance</span>
+        </button>
+
+        <button data-page="study" onclick="go('study')">
+          ▤ <span>Study</span>
+        </button>
+      </nav>
+      <div class="consistency">
+        <strong>✦ Stay consistent</strong>
+        <span>Small progress adds up.</span>
+        <div class="mini-chart"><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="profile">
+        <div class="avatar">H</div>
+        <div><strong>Hashiful Islam</strong><span>Student</span><small>hashifulislam95@gmail.com</small></div><b>⌄</b>
+      </div>
+    </aside>
+
+    <main id="main"></main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
