@@ -54,8 +54,26 @@ function attendance() {
 function renderAttendanceList() { let box = $("#attendanceList"); if (!box) return; box.innerHTML = state.attendance.length ? `<table class="table"><thead><tr><th>Subject</th><th>Date</th><th>Time</th><th>Status</th></tr></thead><tbody>${state.attendance.map(x => `<tr><td>${x.subject}</td><td>${x.date}</td><td>${x.start} – ${x.end}</td><td><span class="badge ${x.status === "Present" ? "green" : "red"}">${x.status}</span></td></tr>`).join("")}</tbody></table>` : `<div class="empty"><div class="empty-icon">▣</div><h3>No classes recorded yet</h3><p>Add your first class to start tracking your attendance.</p><button class="primary" onclick="$('#attSubject').focus()">＋ Add Your First Class</button></div>` }
 function addAttendance() { let subject = $("#attSubject").value.trim(); if (!subject) return alert("Enter a subject."); state.attendance.unshift({ subject, date: $("#attDate").value || new Date().toISOString().slice(0, 10), start: $("#attStart").value || "--:--", end: $("#attEnd").value || "--:--", status: $("#attStatus").value, notes: $("#attNotes").value }); save(); render(); renderAttendanceList() }
 
-let timer = null, seconds = 0, running = false, mode = "stopwatch";
+/* =========================================================
+   STUDY TIMER
+========================================================= */
+
+let timer = null;
+let seconds = 0;
+let running = false;
+let mode = "stopwatch";
+
+let countdownTotal = 25 * 60;
+let countdownRemaining = 25 * 60;
+let elapsedSeconds = 0;
+
+
+/* =========================================================
+   STUDY PAGE
+========================================================= */
+
 function study() {
+
     const history = state.study.length
         ? `
             <table class="table">
@@ -66,6 +84,7 @@ function study() {
                         <th>Date</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     ${state.study.map(x => `
                         <tr>
@@ -79,9 +98,18 @@ function study() {
         `
         : `
             <div class="empty-icon">◷</div>
-            <h3>Start your first study session and track your progress!</h3>
-            <p>Track your focused study time and build a consistent routine.</p>
-            <button class="primary" onclick="document.querySelector('#studySubject').focus()">
+
+            <h3>
+                Start your first study session and track your progress!
+            </h3>
+
+            <p>
+                Track your focused study time and build a consistent routine.
+            </p>
+
+            <button
+                class="primary"
+                onclick="document.querySelector('#studySubject').focus()">
                 ＋ Start Your First Session
             </button>
         `;
@@ -90,66 +118,145 @@ function study() {
         "Study",
         "Track focused study sessions and build a consistent routine.",
         `
+
         <div class="panel study-box">
 
+            <!-- TIMER AREA -->
             <div class="timer-main">
 
-                <div class="eyebrow">FOCUS MODE</div>
-
-                <h2>Focus Timer</h2>
-
-                <div class="timer-status">
-                    <span class="status-dot"></span>
-                    Ready
+                <div class="eyebrow">
+                    FOCUS MODE
                 </div>
 
+                <h2>
+                    Focus Timer
+                </h2>
+
+                <div class="timer-status" id="timerStatus">
+                    <span class="status-dot"></span>
+                    ${running ? "Focusing..." : (elapsedSeconds > 0 ? "Paused" : "Ready")}
+                </div>
+
+
+                <!-- STOPWATCH / COUNTDOWN -->
                 <div class="mode-switch">
+
                     <button
-                        class="active"
+                        class="${mode === "stopwatch" ? "active" : ""}"
                         onclick="setMode('stopwatch')">
                         ⏱ Stopwatch
                     </button>
 
                     <button
+                        class="${mode === "countdown" ? "active" : ""}"
                         onclick="setMode('countdown')">
                         ⌛ Countdown
                     </button>
+
                 </div>
 
-                <div id="timer" class="timer">
-                    00:00:00
+
+                <!-- CUSTOM COUNTDOWN -->
+                <div
+                    id="countdownSettings"
+                    class="countdown-settings"
+                    style="${mode === "countdown" ? "" : "display:none;"}">
+
+                    <label>
+                        Set countdown duration
+                    </label>
+
+                    <div class="countdown-input-row">
+
+                        <input
+                            id="customHours"
+                            type="number"
+                            min="0"
+                            max="24"
+                            value="${Math.floor(countdownTotal / 3600)}"
+                            placeholder="Hours">
+
+                        <span>:</span>
+
+                        <input
+                            id="customMinutes"
+                            type="number"
+                            min="0"
+                            max="59"
+                            value="${Math.floor((countdownTotal % 3600) / 60)}"
+                            placeholder="Minutes">
+
+                        <span>:</span>
+
+                        <input
+                            id="customSeconds"
+                            type="number"
+                            min="0"
+                            max="59"
+                            value="${countdownTotal % 60}"
+                            placeholder="Seconds">
+
+                        <button
+                            class="secondary"
+                            onclick="setCustomCountdown()">
+                            Set
+                        </button>
+
+                    </div>
+
                 </div>
 
+
+                <!-- BIG TIMER -->
+                <div
+                    id="timer"
+                    class="timer">
+                    ${fmt(mode === "countdown" ? countdownRemaining : seconds)}
+                </div>
+
+
+                <!-- SUBJECT -->
                 <div class="study-input">
+
                     <input
                         id="studySubject"
                         placeholder="✎ What are you studying?"
-                    >
+                        value="${document.querySelector("#studySubject")?.value || ""}">
+
                 </div>
 
+
+                <!-- ACTION BUTTONS -->
                 <div class="timer-actions">
 
                     <button
+                        id="startTimerBtn"
                         class="secondary"
                         onclick="startTimer()">
-                        ▶ Start
+                        ${running ? "▶ Running" : (elapsedSeconds > 0 ? "▶ Resume" : "▶ Start")}
                     </button>
 
                     <button
+                        id="pauseTimerBtn"
                         class="secondary"
-                        onclick="pauseTimer()">
+                        onclick="pauseTimer()"
+                        ${!running ? "disabled" : ""}>
                         ⏸ Pause
                     </button>
 
                     <button
+                        id="resetTimerBtn"
                         class="secondary"
-                        onclick="resetTimer()">
+                        onclick="resetTimer()"
+                        ${!elapsedSeconds && !(mode === "countdown" && countdownRemaining !== countdownTotal) ? "disabled" : ""}>
                         ↻ Reset
                     </button>
 
                     <button
+                        id="finishTimerBtn"
                         class="danger"
-                        onclick="finishTimer()">
+                        onclick="finishTimer()"
+                        ${elapsedSeconds <= 0 ? "disabled" : ""}>
                         ■ Finish
                     </button>
 
@@ -157,46 +264,500 @@ function study() {
 
             </div>
 
-            <div class="illustration">
-                💡
-                <br>
-                📚
+
+            <!-- RIGHT SIDE IMAGE -->
+            <div class="study-illustration">
+
+                <img
+                    src="study-lamp.png"
+                    alt="Study lamp and books">
+
             </div>
 
         </div>
 
+
+        <!-- STUDY HISTORY -->
         <div class="panel">
 
             <div class="panel-head">
 
                 <div>
-                    <div class="eyebrow">HISTORY</div>
-                    <h2>Study History</h2>
+
+                    <div class="eyebrow">
+                        HISTORY
+                    </div>
+
+                    <h2>
+                        Study History
+                    </h2>
+
                 </div>
 
                 <div class="searchbar">
+
                     <span>⌕</span>
-                    <input placeholder="Search sessions...">
+
+                    <input
+                        placeholder="Search sessions...">
+
                 </div>
 
             </div>
 
             <div class="empty">
+
                 ${history}
+
             </div>
 
         </div>
+
         `
     );
 }
-function fmt(s) { s = Math.max(0, s || 0); return [Math.floor(s / 3600), Math.floor(s % 3600 / 60), s % 60].map(x => String(x).padStart(2, "0")).join(":") }
-function updateTimer() { let el = $("#timer"); if (el) el.textContent = fmt(seconds) }
-function startTimer() { if (running) return; running = true; timer = setInterval(() => { seconds++; updateTimer() }, 1000) }
-function pauseTimer() { running = false; clearInterval(timer) }
-function resetTimer() { pauseTimer(); seconds = 0; updateTimer() }
-function finishTimer() { pauseTimer(); if (seconds) { state.study.unshift({ subject: $("#studySubject").value.trim(), seconds, date: new Date().toISOString() }); save() } seconds = 0; render() }
-function setMode(m) { mode = m; document.querySelectorAll(".mode-switch button").forEach((b, i) => b.classList.toggle("active", (m === "stopwatch" && i === 0) || (m === "countdown" && i === 1))) }
 
+
+/* =========================================================
+   FORMAT TIME
+========================================================= */
+
+function fmt(totalSeconds) {
+
+    totalSeconds = Math.max(
+        0,
+        Number(totalSeconds) || 0
+    );
+
+    const hours = Math.floor(
+        totalSeconds / 3600
+    );
+
+    const minutes = Math.floor(
+        (totalSeconds % 3600) / 60
+    );
+
+    const seconds = totalSeconds % 60;
+
+    return [
+        hours,
+        minutes,
+        seconds
+    ]
+        .map(x => String(x).padStart(2, "0"))
+        .join(":");
+}
+
+
+/* =========================================================
+   UPDATE TIMER UI
+========================================================= */
+
+function updateTimer() {
+
+    const timerElement = $("#timer");
+
+    if (!timerElement) {
+        return;
+    }
+
+
+    /* Display correct timer */
+
+    if (mode === "countdown") {
+
+        timerElement.textContent =
+            fmt(countdownRemaining);
+
+    } else {
+
+        timerElement.textContent =
+            fmt(seconds);
+
+    }
+
+
+    /* Buttons */
+
+    const startBtn =
+        $("#startTimerBtn");
+
+    const pauseBtn =
+        $("#pauseTimerBtn");
+
+    const resetBtn =
+        $("#resetTimerBtn");
+
+    const finishBtn =
+        $("#finishTimerBtn");
+
+    const status =
+        $("#timerStatus");
+
+
+    if (startBtn) {
+
+        if (running) {
+
+            startBtn.textContent =
+                "▶ Running";
+
+            startBtn.disabled = true;
+
+        } else if (elapsedSeconds > 0) {
+
+            startBtn.textContent =
+                "▶ Resume";
+
+            startBtn.disabled = false;
+
+        } else {
+
+            startBtn.textContent =
+                "▶ Start";
+
+            startBtn.disabled = false;
+        }
+    }
+
+
+    if (pauseBtn) {
+
+        pauseBtn.textContent =
+            running ? "⏸ Pause" : "⏸ Paused";
+
+        pauseBtn.disabled =
+            !running;
+    }
+
+
+    if (resetBtn) {
+
+        const hasTime =
+            elapsedSeconds > 0 ||
+            (
+                mode === "countdown" &&
+                countdownRemaining !== countdownTotal
+            );
+
+        resetBtn.disabled =
+            !hasTime;
+    }
+
+
+    if (finishBtn) {
+
+        finishBtn.disabled =
+            elapsedSeconds <= 0;
+    }
+
+
+    /* Status */
+
+    if (status) {
+
+        if (running) {
+
+            status.innerHTML =
+                `<span class="status-dot running"></span> Focusing...`;
+
+        } else if (elapsedSeconds > 0) {
+
+            status.innerHTML =
+                `<span class="status-dot paused"></span> Paused`;
+
+        } else {
+
+            status.innerHTML =
+                `<span class="status-dot"></span> Ready`;
+        }
+    }
+}
+
+
+/* =========================================================
+   START TIMER
+========================================================= */
+
+function startTimer() {
+
+    if (running) {
+        return;
+    }
+
+
+    /* Countdown must have a duration */
+
+    if (
+        mode === "countdown" &&
+        countdownRemaining <= 0
+    ) {
+
+        alert(
+            "Please set a countdown duration first."
+        );
+
+        return;
+    }
+
+
+    running = true;
+
+    updateTimer();
+
+
+    timer = setInterval(() => {
+
+        /* STOPWATCH */
+
+        if (mode === "stopwatch") {
+
+            seconds++;
+            elapsedSeconds++;
+
+        }
+
+
+        /* COUNTDOWN */
+
+        else {
+
+            if (countdownRemaining > 0) {
+
+                countdownRemaining--;
+
+                elapsedSeconds++;
+
+            }
+
+
+            /* Finished */
+
+            if (countdownRemaining <= 0) {
+
+                countdownRemaining = 0;
+
+                pauseTimer();
+
+                updateTimer();
+
+                alert(
+                    "Countdown finished!"
+                );
+
+                return;
+            }
+        }
+
+
+        updateTimer();
+
+    }, 1000);
+}
+
+
+/* =========================================================
+   PAUSE TIMER
+========================================================= */
+
+function pauseTimer() {
+
+    running = false;
+
+    if (timer) {
+
+        clearInterval(timer);
+
+        timer = null;
+    }
+
+    updateTimer();
+}
+
+
+/* =========================================================
+   RESET TIMER
+========================================================= */
+
+function resetTimer() {
+
+    pauseTimer();
+
+    seconds = 0;
+
+    elapsedSeconds = 0;
+
+    countdownRemaining =
+        countdownTotal;
+
+    updateTimer();
+}
+
+
+/* =========================================================
+   FINISH TIMER
+========================================================= */
+
+function finishTimer() {
+
+    if (elapsedSeconds <= 0) {
+
+        alert(
+            "Start studying before finishing the session."
+        );
+
+        return;
+    }
+
+
+    pauseTimer();
+
+
+    const subject =
+        $("#studySubject")?.value.trim() ||
+        "Study session";
+
+
+    state.study.unshift({
+
+        subject: subject,
+
+        seconds: elapsedSeconds,
+
+        date: new Date().toISOString()
+
+    });
+
+
+    save();
+
+
+    /* Reset timer */
+
+    seconds = 0;
+
+    elapsedSeconds = 0;
+
+    countdownRemaining =
+        countdownTotal;
+
+
+    render();
+}
+
+
+/* =========================================================
+   CUSTOM COUNTDOWN
+========================================================= */
+
+function setCustomCountdown() {
+
+    const hours =
+        Number($("#customHours")?.value || 0);
+
+    const minutes =
+        Number($("#customMinutes")?.value || 0);
+
+    const secondsInput =
+        Number($("#customSeconds")?.value || 0);
+
+
+    if (
+        hours < 0 ||
+        minutes < 0 ||
+        secondsInput < 0
+    ) {
+
+        alert(
+            "Enter a valid duration."
+        );
+
+        return;
+    }
+
+
+    if (
+        minutes > 59 ||
+        secondsInput > 59 ||
+        hours > 24
+    ) {
+
+        alert(
+            "Use Hours 0–24, Minutes 0–59 and Seconds 0–59."
+        );
+
+        return;
+    }
+
+
+    const total =
+        hours * 3600 +
+        minutes * 60 +
+        secondsInput;
+
+
+    if (total <= 0) {
+
+        alert(
+            "Please set a duration greater than 0."
+        );
+
+        return;
+    }
+
+
+    pauseTimer();
+
+
+    mode = "countdown";
+
+    countdownTotal = total;
+
+    countdownRemaining = total;
+
+    elapsedSeconds = 0;
+
+    seconds = 0;
+
+
+    updateTimer();
+
+    render();
+}
+
+
+/* =========================================================
+   SWITCH STOPWATCH / COUNTDOWN
+========================================================= */
+
+function setMode(newMode) {
+
+    if (running) {
+        return;
+    }
+
+
+    mode = newMode;
+
+    seconds = 0;
+
+    elapsedSeconds = 0;
+
+
+    if (mode === "countdown") {
+
+        countdownRemaining =
+            countdownTotal;
+
+    } else {
+
+        countdownRemaining =
+            countdownTotal;
+    }
+
+
+    render();
+}
 function go(page) { location.hash = page }
 function render() {
     let page = location.hash.replace("#", "") || "dashboard"; if (!["dashboard", "tasks", "expenses", "attendance", "study"].includes(page)) page = "dashboard";
